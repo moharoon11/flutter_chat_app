@@ -1,4 +1,11 @@
+import 'dart:io';
+
+import 'package:chat_app/widgets/user_image_picker.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+
+final _firebaseAuth = FirebaseAuth.instance;
 
 class AuthScreen extends StatefulWidget {
   const AuthScreen({super.key});
@@ -9,18 +16,65 @@ class AuthScreen extends StatefulWidget {
 
 class _AuthScreenState extends State<AuthScreen> {
   bool _isLogin = true;
+  bool _showLoadingIndicator = false;
   String _enteredEmail = '';
   String _enteredPassword = '';
   final _form = GlobalKey<FormState>();
+  File? _selectedImage;
 
-  void _onSubmit() {
+  bool _isPasswordVisiblity = false;
+
+  void _onSubmit() async {
     final isValid = _form.currentState!.validate();
 
-    if (!isValid) {
+    if (!isValid || (!_isLogin && _selectedImage == null)) {
       return;
     }
 
     _form.currentState!.save();
+
+    try {
+      setState(() {
+        _showLoadingIndicator = true;
+      });
+
+      Future.delayed(const Duration(seconds: 3));
+
+      if (_isLogin) {
+        final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+          email: _enteredEmail,
+          password: _enteredPassword,
+        );
+      } else {
+        final userCredential =
+            await _firebaseAuth.createUserWithEmailAndPassword(
+          email: _enteredEmail,
+          password: _enteredPassword,
+        );
+
+        final storageRef = FirebaseStorage.instance
+            .ref()
+            .child('user_images')
+            .child('${userCredential.user!.uid}.jpg');
+
+        await storageRef.putFile(_selectedImage!);
+        final imageUrl = await storageRef.getDownloadURL();
+        print(imageUrl);
+      }
+    } on FirebaseAuthException catch (error) {
+      ScaffoldMessenger.of(context).clearSnackBars();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            error.message ?? 'Authentication Failed',
+          ),
+        ),
+      );
+
+      setState(() {
+        _showLoadingIndicator = false;
+      });
+    }
   }
 
   @override
@@ -51,6 +105,12 @@ class _AuthScreenState extends State<AuthScreen> {
                         child: Column(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (!_isLogin)
+                              UserImagePicker(
+                                onPickImage: (image) {
+                                  _selectedImage = image;
+                                },
+                              ),
                             TextFormField(
                                 decoration: const InputDecoration(
                                   labelText: 'Email',
@@ -71,10 +131,18 @@ class _AuthScreenState extends State<AuthScreen> {
                                   _enteredEmail = value!;
                                 }),
                             TextFormField(
-                              decoration: const InputDecoration(
+                              decoration: InputDecoration(
+                                suffixIcon: Icon(_isPasswordVisiblity
+                                    ? Icons.visibility
+                                    : Icons.visibility_off),
                                 labelText: 'Password',
                               ),
-                              obscureText: true,
+                              obscureText: !_isPasswordVisiblity,
+                              onTap: () {
+                                setState(() {
+                                  _isPasswordVisiblity = !_isPasswordVisiblity;
+                                });
+                              },
                               validator: (value) {
                                 if (value == null || value.length < 6) {
                                   return "password cannot be less than 6 characters";
@@ -95,12 +163,17 @@ class _AuthScreenState extends State<AuthScreen> {
                                     .onPrimaryContainer
                                     .withOpacity(0.8),
                               ),
-                              child: Text(
-                                _isLogin ? 'Log in' : 'Sign up',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                ),
-                              ),
+                              child: (_showLoadingIndicator)
+                                  ? const Padding(
+                                      padding: EdgeInsets.all(8.0),
+                                      child: CircularProgressIndicator(),
+                                    )
+                                  : Text(
+                                      _isLogin ? 'Log in' : 'Sign up',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                      ),
+                                    ),
                             ),
                             const SizedBox(height: 16.0),
                             TextButton(
