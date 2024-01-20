@@ -1,6 +1,7 @@
 import 'dart:io';
 
 import 'package:chat_app/widgets/user_image_picker.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -19,6 +20,7 @@ class _AuthScreenState extends State<AuthScreen> {
   bool _showLoadingIndicator = false;
   String _enteredEmail = '';
   String _enteredPassword = '';
+  String _enteredUsername = '';
   final _form = GlobalKey<FormState>();
   File? _selectedImage;
 
@@ -59,7 +61,15 @@ class _AuthScreenState extends State<AuthScreen> {
 
         await storageRef.putFile(_selectedImage!);
         final imageUrl = await storageRef.getDownloadURL();
-        print(imageUrl);
+
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userCredential.user!.uid)
+            .set({
+          'username': _enteredUsername,
+          'email': _enteredEmail,
+          'imageUrl': imageUrl,
+        });
       }
     } on FirebaseAuthException catch (error) {
       ScaffoldMessenger.of(context).clearSnackBars();
@@ -80,120 +90,147 @@ class _AuthScreenState extends State<AuthScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Theme.of(context).colorScheme.primary,
-      body: Center(
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.only(
-                  top: 30,
-                  bottom: 20,
-                  left: 20,
-                  right: 20,
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            colors: [
+              Colors.deepPurple.withOpacity(0.9),
+              Colors.deepPurple.withOpacity(0.6),
+            ],
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(
+                    top: 30,
+                    bottom: 20,
+                    left: 20,
+                    right: 20,
+                  ),
+                  width: 200,
+                  child: Image.asset('assets/images/chat.png'),
                 ),
-                width: 200,
-                child: Image.asset('assets/images/chat.png'),
-              ),
-              Card(
-                margin: const EdgeInsets.all(8.0),
-                child: SingleChildScrollView(
-                  child: Padding(
-                    padding: const EdgeInsets.all(8.0),
-                    child: Form(
-                        key: _form,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (!_isLogin)
-                              UserImagePicker(
-                                onPickImage: (image) {
-                                  _selectedImage = image;
-                                },
-                              ),
-                            TextFormField(
-                                decoration: const InputDecoration(
-                                  labelText: 'Email',
+                Card(
+                  margin: const EdgeInsets.all(16.0),
+                  child: SingleChildScrollView(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Form(
+                          key: _form,
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              if (!_isLogin)
+                                UserImagePicker(
+                                  onPickImage: (image) {
+                                    _selectedImage = image;
+                                  },
                                 ),
-                                keyboardType: TextInputType.emailAddress,
-                                textCapitalization: TextCapitalization.none,
-                                autocorrect: false,
+                              if (!_isLogin)
+                                TextFormField(
+                                    decoration: const InputDecoration(
+                                      labelText: 'Username',
+                                    ),
+                                    validator: (value) {
+                                      if (value == null || value.length < 3) {
+                                        return 'Username must contain minimum of 3 characters';
+                                      }
+
+                                      return null;
+                                    },
+                                    onSaved: (value) {
+                                      _enteredUsername = value!;
+                                    }),
+                              TextFormField(
+                                  decoration: const InputDecoration(
+                                    labelText: 'Email',
+                                  ),
+                                  keyboardType: TextInputType.emailAddress,
+                                  textCapitalization: TextCapitalization.none,
+                                  autocorrect: false,
+                                  validator: (value) {
+                                    if (value == null ||
+                                        value.trim().isEmpty ||
+                                        !value.contains('@')) {
+                                      return 'Please enter a valid email';
+                                    }
+
+                                    return null;
+                                  },
+                                  onSaved: (value) {
+                                    _enteredEmail = value!;
+                                  }),
+                              TextFormField(
+                                decoration: InputDecoration(
+                                  suffixIcon: Icon(_isPasswordVisiblity
+                                      ? Icons.visibility
+                                      : Icons.visibility_off),
+                                  labelText: 'Password',
+                                ),
+                                obscureText: !_isPasswordVisiblity,
+                                onTap: () {
+                                  setState(() {
+                                    _isPasswordVisiblity =
+                                        !_isPasswordVisiblity;
+                                  });
+                                },
                                 validator: (value) {
-                                  if (value == null ||
-                                      value.trim().isEmpty ||
-                                      !value.contains('@')) {
-                                    return 'Please enter a valid email';
+                                  if (value == null || value.length < 6) {
+                                    return "password cannot be less than 6 characters";
                                   }
 
                                   return null;
                                 },
                                 onSaved: (value) {
-                                  _enteredEmail = value!;
-                                }),
-                            TextFormField(
-                              decoration: InputDecoration(
-                                suffixIcon: Icon(_isPasswordVisiblity
-                                    ? Icons.visibility
-                                    : Icons.visibility_off),
-                                labelText: 'Password',
+                                  _enteredPassword = value!;
+                                },
                               ),
-                              obscureText: !_isPasswordVisiblity,
-                              onTap: () {
-                                setState(() {
-                                  _isPasswordVisiblity = !_isPasswordVisiblity;
-                                });
-                              },
-                              validator: (value) {
-                                if (value == null || value.length < 6) {
-                                  return "password cannot be less than 6 characters";
-                                }
-
-                                return null;
-                              },
-                              onSaved: (value) {
-                                _enteredPassword = value!;
-                              },
-                            ),
-                            const SizedBox(height: 16.0),
-                            ElevatedButton(
-                              onPressed: _onSubmit,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Theme.of(context)
-                                    .colorScheme
-                                    .onPrimaryContainer
-                                    .withOpacity(0.8),
-                              ),
-                              child: (_showLoadingIndicator)
-                                  ? const Padding(
-                                      padding: EdgeInsets.all(8.0),
-                                      child: CircularProgressIndicator(),
-                                    )
-                                  : Text(
-                                      _isLogin ? 'Log in' : 'Sign up',
-                                      style: const TextStyle(
-                                        color: Colors.white,
+                              const SizedBox(height: 16.0),
+                              ElevatedButton(
+                                onPressed: _onSubmit,
+                                style: ElevatedButton.styleFrom(
+                                  backgroundColor: Theme.of(context)
+                                      .colorScheme
+                                      .onPrimaryContainer
+                                      .withOpacity(0.8),
+                                ),
+                                child: (_showLoadingIndicator)
+                                    ? const Padding(
+                                        padding: EdgeInsets.all(8.0),
+                                        child: CircularProgressIndicator(),
+                                      )
+                                    : Text(
+                                        _isLogin ? 'Log in' : 'Sign up',
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                        ),
                                       ),
-                                    ),
-                            ),
-                            const SizedBox(height: 16.0),
-                            TextButton(
-                              onPressed: () {
-                                setState(() {
-                                  _isLogin = !_isLogin;
-                                });
-                              },
-                              child: Text(
-                                _isLogin
-                                    ? 'Create an account'
-                                    : 'Already have an account, Log in.',
                               ),
-                            )
-                          ],
-                        )),
+                              const SizedBox(height: 16.0),
+                              TextButton(
+                                onPressed: () {
+                                  setState(() {
+                                    _isLogin = !_isLogin;
+                                  });
+                                },
+                                child: Text(
+                                  _isLogin
+                                      ? 'Create an account'
+                                      : 'Already have an account, Log in.',
+                                ),
+                              )
+                            ],
+                          )),
+                    ),
                   ),
-                ),
-              )
-            ],
+                )
+              ],
+            ),
           ),
         ),
       ),
