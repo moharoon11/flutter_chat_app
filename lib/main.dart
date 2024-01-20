@@ -33,7 +33,11 @@ class _AppState extends State<App> {
   }
 
   void _hideSplash() async {
-    await Future.delayed(const Duration(seconds: 3));
+    await Future.delayed(
+      const Duration(
+        seconds: 2,
+      ),
+    );
     setState(() {
       _showSplash = false;
     });
@@ -42,6 +46,7 @@ class _AppState extends State<App> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      debugShowCheckedModeBanner: false,
       title: 'FlutterChat',
       theme: ThemeData().copyWith(
         colorScheme: ColorScheme.fromSeed(
