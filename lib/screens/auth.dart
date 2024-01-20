@@ -43,7 +43,7 @@ class _AuthScreenState extends State<AuthScreen> {
       Future.delayed(const Duration(seconds: 3));
 
       if (_isLogin) {
-        final userCredential = await _firebaseAuth.signInWithEmailAndPassword(
+        await _firebaseAuth.signInWithEmailAndPassword(
           email: _enteredEmail,
           password: _enteredPassword,
         );

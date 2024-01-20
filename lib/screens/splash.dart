@@ -1,6 +1,3 @@
-import 'package:chat_app/screens/auth.dart';
-import 'package:chat_app/screens/chat.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 
 class SplashScreen extends StatelessWidget {
